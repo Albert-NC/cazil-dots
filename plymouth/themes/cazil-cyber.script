@@ -1,0 +1,115 @@
+# CAZIL CYBERPUNK PLYMOUTH THEME
+# Estética Cyberpunk con colores neón
+
+// Fondo de imagen con logo (se carga desde el tema instalado)
+background_image = Image("bg_grub1_con_logo.png");
+if (background_image) {
+    scaled_bg = background_image.Scale(Window.GetWidth(), Window.GetHeight());
+    background_sprite = Sprite(scaled_bg);
+    background_sprite.SetX(0);
+    background_sprite.SetY(0);
+    background_sprite.SetZ(-100);
+} else {
+    // Fallback: degradado morado oscuro
+    Window.SetBackgroundTopColor(0.05, 0.05, 0.08);
+    Window.SetBackgroundBottomColor(0.11, 0.08, 0.15);
+}
+
+screen_width = Window.GetWidth();
+screen_height = Window.GetHeight();
+
+// =============== LOGO YA INTEGRADO EN FONDO ===============
+// El logo está en bg_grub1_con_logo.png, no necesitamos cargarlo aparte
+
+// =============== PARTÍCULAS MATRIX ===============
+// Crear 20 "gotas" de código cayendo (Bucle de animación)
+for (i = 0; i < 20; i++) {
+    particle[i].sprite = Sprite();
+    particle[i].x = Math.Random() * screen_width;
+    particle[i].y = -Math.Random() * screen_height;
+    particle[i].speed = 2 + Math.Random() * 3;
+    particle[i].char = Math.Int(Math.Random() * 10);
+}
+
+// =============== BARRA DE PROGRESO ===============
+// (Requiere que las imágenes progress_box.png y progress_bar.png hayan sido generadas por el script ImageMagick)
+progress_box.image = Image("progress_box.png");
+progress_box.sprite = Sprite(progress_box.image);
+progress_box.sprite.SetX(screen_width / 2 - progress_box.image.GetWidth() / 2);
+progress_box.sprite.SetY(screen_height * 0.75);
+
+progress_bar.image = Image("progress_bar.png");
+progress_bar.sprite = Sprite(progress_bar.image);
+progress_bar.sprite.SetX(screen_width / 2 - progress_bar.image.GetWidth() / 2);
+progress_bar.sprite.SetY(screen_height * 0.75);
+
+// =============== MENSAJE DE ENTRADA ===============
+message_sprite = Sprite();
+message_sprite.SetPosition(screen_width / 2, screen_height * 0.85, 1);
+
+// =============== ANIMACIÓN PRINCIPAL (REFRESH CALLBACK) ===============
+fun refresh_callback() {
+    // Actualizar partículas cyan
+    for (i = 0; i < 20; i++) {
+        particle[i].y += particle[i].speed;
+        
+        // Reiniciar si sale de pantalla
+        if (particle[i].y > screen_height) {
+            particle[i].y = -20;
+            particle[i].x = Math.Random() * screen_width;
+        }
+        
+        // Crear caracter (0-9) - Cyan neón cyberpunk
+        char_img = Image.Text(particle[i].char, 0.0, 0.85, 1.0); // RGB: Cyan neón #00d9ff
+        particle[i].sprite.SetImage(char_img);
+        particle[i].sprite.SetPosition(particle[i].x, particle[i].y, 0);
+    }
+}
+
+Plymouth.SetRefreshFunction(refresh_callback);
+
+// =============== PROGRESO DE BOOT ===============
+fun progress_callback(duration, progress) {
+    if (progress_bar.image) {
+        new_width = progress_bar.image.GetWidth() * progress;
+        progress_bar.sprite.SetImage(progress_bar.image.Scale(new_width, progress_bar.image.GetHeight()));
+    }
+}
+
+Plymouth.SetBootProgressFunction(progress_callback);
+
+// =============== ENTRADA DE CONTRASEÑA (LUKS PROMPT) ===============
+fun display_password_callback(prompt, bullets) {
+    bullet_text = "";
+    for (i = 0; i < bullets; i++) {
+        bullet_text += "█"; // Dibuja bloques sólidos para ocultar la contraseña
+    }
+    
+    // Texto del prompt - Rosa neón
+    prompt_text = "<<< Bienvenido CZ >>> " + prompt;
+    message_image = Image.Text(prompt_text, 1.0, 0.3, 0.65); // RGB: Rosa neón #ff4da6
+    bullet_image = Image.Text(bullet_text, 0.0, 0.85, 1.0);  // RGB: Cyan neón #00d9ff
+    
+    // Combinar prompt y bullets
+    combined = message_image.Append(bullet_image, 10, 0);
+    message_sprite.SetImage(combined);
+    message_sprite.SetX(screen_width / 2 - combined.GetWidth() / 2);
+}
+
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+
+// =============== MENSAJES DEL SISTEMA (Error/Info) ===============
+fun message_callback(text) {
+    // Mensajes en cyan neón
+    message_image = Image.Text(text, 0.0, 0.85, 1.0);
+    message_sprite.SetImage(message_image);
+    message_sprite.SetX(screen_width / 2 - message_image.GetWidth() / 2);
+}
+
+Plymouth.SetMessageFunction(message_callback);
+
+fun display_normal_callback() {
+    message_sprite.SetImage(Image.Text("", 0, 0, 0));
+}
+
+Plymouth.SetDisplayNormalFunction(display_normal_callback);

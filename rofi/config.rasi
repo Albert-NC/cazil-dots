@@ -1,0 +1,18 @@
+configuration {
+    /* Define el tipo de menú (Drun = Lista de Apps) */
+    modi: "drun";
+    
+    /* CRÍTICO: Carga el tema personalizado */
+    theme: "cazil_theme";
+
+    /* Comportamiento y tamaño de la ventana */
+    show-icons: true;
+    location: center;
+    anchor: center;
+    width: 40%; 
+    lines: 10;
+    
+    /* Terminal por defecto */
+    terminal: "kitty"; 
+    run-command: "zsh -c '{cmd}'";
+}

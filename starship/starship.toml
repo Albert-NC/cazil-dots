@@ -1,0 +1,71 @@
+format = """
+[ ](bg:#1a1b2e)\
+$os\
+$username\
+[](bg:#2d1f3d fg:#1a1b2e)\
+$directory\
+[](fg:#2d1f3d bg:#0d0d14)\
+$git_branch\
+$git_status\
+[](fg:#0d0d14 bg:#1a1b2e)\
+$time\
+[](fg:#1a1b2e bg:#0d0d14)\
+$cmd_duration\
+[  ](fg:#0d0d14)\
+"""
+add_newline = true
+
+[username]
+show_always = true
+style_user = "bg:#1a1b2e fg:#00d9ff"
+style_root = "bg:#ff4da6 fg:#0d0d14"
+format = '[$user ]($style)'
+disabled = false
+
+[os]
+style = "bg:#1a1b2e fg:#00d9ff"
+disabled = false
+
+[os.symbols]
+Arch = "󰣇 "
+Debian = " "
+Fedora = " "
+Linux = " "
+Manjaro = " "
+Pop = " "
+Ubuntu = " "
+Unknown = " "
+Windows = " "
+
+[directory]
+style = "bg:#2d1f3d fg:#ff4da6"
+format = "[ $path ]($style)"
+truncation_length = 3
+truncation_symbol = "…/"
+
+[directory.substitutions]
+"Documents" = "󰈙 "
+"Downloads" = " "
+"Music" = " "
+"Pictures" = " "
+
+[git_branch]
+symbol = ""
+style = "bg:#0d0d14 fg:#00d9ff"
+format = '[ $symbol $branch ]($style)'
+
+[git_status]
+style = "bg:#0d0d14 fg:#00d9ff"
+format = '[$all_status$ahead_behind ]($style)'
+
+[time]
+disabled = false
+time_format = "%b %d, %I:%M %P"
+style = "bg:#1a1b2e fg:#ff4da6"
+format = "[ $time ]($style)"
+
+[cmd_duration]
+disabled = false
+min_time = 2000
+style = 'bg:#0d0d14 fg:#00d9ff'
+format = '[ $duration ]($style)'

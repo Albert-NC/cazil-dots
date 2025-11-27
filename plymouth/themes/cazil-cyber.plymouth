@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=CAZIL Cyberpunk
+Description=Animated cyberpunk boot theme with matrix effects
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/cazil-cyber
+ScriptFile=/usr/share/plymouth/themes/cazil-cyber/cazil-cyber.script

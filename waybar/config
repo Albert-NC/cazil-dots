@@ -1,0 +1,78 @@
+{
+    "layer": "top",
+    "position": "top",
+    "height": 30,
+    "spacing": 3,
+    "fixed-center": true,
+
+    // Módulos que quedan
+    "modules-left": [
+        "hyprland/workspaces#pacman",
+        "hyprland/window"
+    ],
+    "modules-center": [
+        "clock"
+    ],
+    "modules-right": [
+        // CRÍTICO: Indicador de Modo Avión
+        "custom/airplane-mode",
+        // Aquí estaba CPU y RAM
+        "network",
+        "bluetooth", 
+        "pulseaudio",
+        "pulseaudio#microphone",
+        "battery#cazil_elegant",
+        "tray"
+    ],
+
+    // --- MÓDULOS DE DEFINICIÓN ---
+
+    "hyprland/workspaces#pacman": {
+        "format": " {icon} ",
+        "all-outputs": true,
+        "format-icons": {
+            "1": "󰮇", "2": "󰮆", "3": "󰮅", "4": "󰮄", "5": "󰮃", "default": "󰊠", "active": "󰊯"
+        },
+        "tooltip": true
+    },
+
+    "custom/airplane-mode": {
+        "exec": "$HOME/cazil-dots/sscript/modo_avion.sh",
+        "return-type": "json",
+        "format": "{}",
+        "tail": true
+    },
+
+    "clock": {
+        "format": "🕑 {:%H:%M} | 📅 {:%d/%m}",
+        "tooltip-format": "<big>{:%Y-%m-%d}</big>\n{calendar}"
+    },
+    
+    /* CPU y RAM eliminados para una barra más limpia */
+    
+    "network": {
+        "format-wifi": " {essid}",
+        "format-ethernet": "🔗 Wired",
+        "format-disconnected": "⚠️ Offline"
+    },
+
+    "bluetooth": {
+        "format": " {num_devices}",
+        "format-disabled": "",
+        "format-connected": " {num_devices}",
+        "interval": 5
+    },
+
+    "pulseaudio": { "format": "♪ {volume}%", "format-muted": "🔇 Muted" },
+    "pulseaudio#microphone": { "format": "🎤 {volume}%", "format-source-muted": "🔇 Muted" },
+
+    "battery#cazil_elegant": {
+        "states": { "warning": 25, "critical": 10 },
+        "format": "{icon} {capacity}% ({time})",
+        "format-charging": "⚡ {capacity}%",
+        "format-full": "Full: {icon}",
+        "format-icons": ["", "", "", "", ""]
+    },
+
+    "tray": { "icon-size": 18, "spacing": 10 }
+}
