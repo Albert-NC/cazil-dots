@@ -1,7 +1,3 @@
-V8.1 
-Agg grub y pantalla para el Luks
-
-
 cat << "EOF"
   /$$$$$$  /$$$$$$  /$$$$$$$$ /$$$$$$ /$$
  /$$__  $$/$$__  $$|_____ $$ |_  $$_/| $$
@@ -13,8 +9,6 @@ cat << "EOF"
  \______/|__/  |__/          |______/|________/
 EOF
 echo -e "      >> DEPLOYMENT PROTOCOL v8.1 <<${NC}\n"
-
-
 
 cazil-dots/
 ├── hypr/
@@ -29,7 +23,7 @@ cazil-dots/
 │
 ├── waybar/
 │   ├── config                 <-- (LAYOUT: STATUS, NETWORK, BT, BATERÍA)
-│   └── style.css              <-- (ESTÉTICA: NEÓN/TRANSPARENTE)
+│   ├── style.css              <-- (ESTÉTICA: NEÓN/TRANSPARENTE)
 │   └── ModulesWorkspaces      <-- (MOD: PACMAN ICONS DEFINITION)
 │
 ├── rofi/
@@ -47,10 +41,16 @@ cazil-dots/
 │   └── modo_avion.sh          <-- (SCRIPT: AIRPLANE MODE STATUS CHECK)
 │
 ├── fonts/
-│   └── <archivos_.ttf/.otf>     <-- (CUSTOM/NERD FONTS)
+│   └── <archivos_.ttf/.otf>   <-- (CUSTOM/NERD FONTS)
 │
 ├── wallpapers/
 │   └── cazil_logo.png         <-- (FONDO DE ESCRITORIO Y FUENTE DEL FONDO GRUB)
+│
+├── grub/
+│   └── cazil_grub_theme/      <-- (TEMA PERSONALIZADO GRUB CON WALLPAPER)
+│
+├── plymouth/
+│   └── cazil_theme/           <-- (TEMA PLYMOUTH PARA PANTALLA LUKS UNLOCK)
 │
 ├── fastfetch/
 │   ├── sample_1.jsonc         <-- (CONFIG: FASTFETCH CON LOGO TRANSPARENTE)
