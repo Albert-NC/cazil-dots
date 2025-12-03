@@ -80,7 +80,7 @@ install_base() {
         sudo apt update && sudo apt upgrade -y
         
         log "${CYAN}[*] Instalando paquetes base...${NC}"
-        for pkg in hyprland waybar kitty rofi-wayland curl git micro build-essential net-tools \
+        for pkg in hyprland waybar kitty curl git micro build-essential net-tools \
                    spice-vdagent libinput-tools keepassxc pavucontrol brightnessctl pamixer swww unzip \
                    wl-clipboard grim slurp wget gnupg2 software-properties-common; do
             if ! is_installed "$pkg"; then
@@ -89,6 +89,36 @@ install_base() {
                 log "${GREEN}[OK] $pkg ya instalado.${NC}"
             fi
         done
+        
+        # ROFI (Wayland)
+        if ! command_exists rofi; then
+            log "${CYAN}[*] Instalando Rofi con soporte Wayland...${NC}"
+            # Intentar instalar rofi desde repos (puede tener soporte Wayland en Sid)
+            if sudo apt install -y rofi 2>/dev/null && rofi -help | grep -q "wayland"; then
+                log "${GREEN}[OK] Rofi instalado desde repositorios con soporte Wayland${NC}"
+            else
+                # Si no tiene soporte Wayland, compilar fork de lbonn
+                log "${YELLOW}[!] Compilando Rofi-Wayland desde fuente...${NC}"
+                sudo apt install -y meson ninja-build libpango1.0-dev libcairo2-dev \
+                    libglib2.0-dev libstartup-notification0-dev libxkbcommon-dev \
+                    libxkbcommon-x11-dev libxcb1-dev libxcb-util-dev libxcb-ewmh-dev \
+                    libxcb-icccm4-dev libxcb-xinerama0-dev libxcb-randr0-dev \
+                    libxcb-xrm-dev libwayland-dev wayland-protocols check
+                
+                local tmpdir=$(mktemp -d)
+                cd "$tmpdir"
+                git clone --depth=1 https://github.com/lbonn/rofi.git
+                cd rofi
+                meson setup build
+                ninja -C build
+                sudo ninja -C build install
+                cd ~ && rm -rf "$tmpdir"
+                log "${GREEN}[OK] Rofi-Wayland compilado e instalado${NC}"
+            fi
+        else
+            log "${GREEN}[OK] Rofi ya instalado.${NC}"
+        fi
+        
         log "${GREEN}[OK] Núcleo operativo.${NC}"
     fi
 }
@@ -230,12 +260,6 @@ install_software() {
                 unzip -q "$tmpzip" && sudo mv yazi-*/yazi /usr/local/bin/
                 rm -rf "$tmpzip" yazi-*
             fi
-        fi
-
-        # Gaming
-        if ask "¿Instalar paquetes de Gaming (Steam, Proton)?"; then
-            sudo apt install -y steam-installer gamemode mangohud mesa-utils vulkan-tools \
-                libvulkan1 libvulkan1:i386
         fi
 
         log "${GREEN}[OK] Software desplegado.${NC}"
@@ -468,6 +492,36 @@ link_dotfiles() {
     log "${GREEN}[OK] Dotfiles vinculados${NC}"
 }
 
+# --- 13. AUTO-INICIO DE HYPRLAND ---
+configure_hyprland_autostart() {
+    if ask "¿Configurar inicio automático de Hyprland al login?"; then
+        log "${CYAN}[*] Configurando auto-inicio de Hyprland...${NC}"
+        
+        # Crear ~/.bash_profile para iniciar Hyprland automáticamente en tty1
+        cat > "$HOME/.bash_profile" << 'BASH_PROFILE_EOF'
+# Auto-inicio de Hyprland en tty1
+if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then
+    exec Hyprland
+fi
+BASH_PROFILE_EOF
+        
+        log "${GREEN}[OK] ~/.bash_profile configurado${NC}"
+        
+        # También crear ~/.zprofile si usa zsh
+        if command_exists zsh; then
+            cat > "$HOME/.zprofile" << 'ZPROFILE_EOF'
+# Auto-inicio de Hyprland en tty1
+if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then
+    exec Hyprland
+fi
+ZPROFILE_EOF
+            log "${GREEN}[OK] ~/.zprofile configurado${NC}"
+        fi
+        
+        log "${YELLOW}[!] Hyprland se iniciará automáticamente en tty1 después del login${NC}"
+    fi
+}
+
 # ================= EJECUCIÓN PRINCIPAL =================
 main() {
     install_base
@@ -483,6 +537,7 @@ main() {
     install_plymouth_theme
     install_grub_theme
     link_dotfiles
+    configure_hyprland_autostart
     
     echo ""
     log "${GREEN}╔════════════════════════════════════════════════╗${NC}"
