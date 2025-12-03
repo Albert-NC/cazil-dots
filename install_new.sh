@@ -364,7 +364,7 @@ install_browsers() {
 
 # --- MULTIMEDIA ---
 install_multimedia() {
-    if ask "¿Instalar suite multimedia (VLC, visores de imagen, Yazi)?";
+    if ask "¿Instalar suite multimedia (VLC, visores de imagen, Yazi)?"; then
         log "${CYAN}[*] Instalando multimedia...${NC}"
         sudo apt install -y vlc feh imv thunar-archive-plugin file-roller
         
@@ -387,7 +387,7 @@ install_multimedia() {
 
 # --- OFICINA ---
 install_office() {
-    if ask "¿Instalar suite de oficina (Zathura PDF + Impresoras)?";
+    if ask "¿Instalar suite de oficina (Zathura PDF + Impresoras)?"; then
         log "${CYAN}[*] Instalando suite de oficina...${NC}"
         sudo apt install -y zathura zathura-pdf-poppler \
             cups system-config-printer avahi-daemon printer-driver-all \
@@ -402,9 +402,9 @@ install_office() {
 
 # --- CREATIVO ---
 install_creative() {
-    if ask "¿Instalar GIMP (editor de imágenes)?";
+    if ask "¿Instalar GIMP (editor de imágenes)?"; then
         log "${RED}[!] Advertencia: GIMP añade ~500MB de dependencias${NC}"
-        if ask "¿Continuar con la instalación de GIMP?";
+        if ask "¿Continuar con la instalación de GIMP?"; then
             log "${CYAN}[*] Instalando GIMP...${NC}"
             sudo apt install -y gimp
             log "${GREEN}[OK] GIMP instalado.${NC}"
