@@ -14,9 +14,8 @@ YELLOW='\033[1;33m'
 MAGENTA='\033[0;35m'
 NC='\033[0m'
 
-# Activar manejo estricto de errores
-set -euo pipefail
-trap 'echo -e "${RED}[ERROR] Ocurrió un error en la línea $LINENO.${NC}"' ERR
+# Desactivar salida en errores para que continúe con el siguiente paso
+set +e
 
 # Validar conectividad a Internet
 if ! ping -c 1 8.8.8.8 &>/dev/null; then
@@ -80,12 +79,12 @@ command_exists() {
 
 install_system_base() {
     log "${CYAN}[*] Actualizando sistema...${NC}"
-    sudo apt update && sudo apt upgrade -y
+    sudo apt update && sudo apt upgrade -y || log "${YELLOW}[!] Error al actualizar, continuando...${NC}"
     
     log "${CYAN}[*] Instalando paquetes base del sistema...${NC}"
     for pkg in curl git wget gnupg2 build-essential net-tools software-properties-common unzip; do
         if ! is_installed "$pkg"; then
-            sudo apt install -y "$pkg"
+            sudo apt install -y "$pkg" || log "${YELLOW}[!] No se pudo instalar $pkg, continuando...${NC}"
         else
             log "${GREEN}[OK] $pkg ya instalado.${NC}"
         fi
@@ -97,7 +96,7 @@ install_hyprland() {
     if ask "¿Instalar Hyprland (Compositor Wayland)?"; then
         if ! command_exists Hyprland; then
             log "${CYAN}[*] Instalando Hyprland...${NC}"
-            sudo apt install -y hyprland
+            sudo apt install -y hyprland || log "${RED}[!] Error al instalar Hyprland${NC}"
             log "${GREEN}[OK] Hyprland instalado.${NC}"
         else
             log "${GREEN}[OK] Hyprland ya está instalado.${NC}"
@@ -110,7 +109,7 @@ install_waybar() {
     if ask "¿Instalar Waybar (Barra de estado)?"; then
         if ! command_exists waybar; then
             log "${CYAN}[*] Instalando Waybar...${NC}"
-            sudo apt install -y waybar
+            sudo apt install -y waybar || log "${RED}[!] Error al instalar Waybar${NC}"
             log "${GREEN}[OK] Waybar instalado.${NC}"
         else
             log "${GREEN}[OK] Waybar ya está instalado.${NC}"
@@ -123,7 +122,7 @@ install_kitty() {
     if ask "¿Instalar Kitty (Terminal emulator)?"; then
         if ! command_exists kitty; then
             log "${CYAN}[*] Instalando Kitty...${NC}"
-            sudo apt install -y kitty
+            sudo apt install -y kitty || log "${RED}[!] Error al instalar Kitty${NC}"
             log "${GREEN}[OK] Kitty instalado.${NC}"
         else
             log "${GREEN}[OK] Kitty ya está instalado.${NC}"
@@ -136,7 +135,7 @@ install_wofi() {
     if ask "¿Instalar Wofi (Lanzador de aplicaciones Wayland)?"; then
         if ! command_exists wofi; then
             log "${CYAN}[*] Instalando Wofi...${NC}"
-            sudo apt install -y wofi
+            sudo apt install -y wofi || log "${RED}[!] Error al instalar Wofi${NC}"
             log "${GREEN}[OK] Wofi instalado.${NC}"
         else
             log "${GREEN}[OK] Wofi ya está instalado.${NC}"
@@ -148,11 +147,34 @@ install_wofi() {
 install_wayland_utils() {
     if ask "¿Instalar utilidades de Wayland (wl-clipboard, grim, slurp, swww)?"; then
         log "${CYAN}[*] Instalando utilidades de Wayland...${NC}"
-        for pkg in wl-clipboard grim slurp swww; do
+        
+        # Instalar paquetes disponibles en repos
+        for pkg in wl-clipboard grim slurp; do
             if ! is_installed "$pkg"; then
                 sudo apt install -y "$pkg" || log "${YELLOW}[!] No se pudo instalar $pkg${NC}"
             fi
         done
+        
+        # swww - Instalar desde GitHub (no está en repos de Debian)
+        if ! command_exists swww; then
+            log "${CYAN}[*] Instalando swww desde GitHub...${NC}"
+            local tmpdir=$(mktemp -d)
+            cd "$tmpdir" || { log "${RED}[!] Error creando directorio temporal${NC}"; return 1; }
+            
+            # Descargar último release
+            if wget -q --show-progress https://github.com/LGFae/swww/releases/latest/download/swww-x86_64-unknown-linux-musl.tar.gz; then
+                tar -xzf swww-x86_64-unknown-linux-musl.tar.gz
+                sudo mv swww swww-daemon /usr/local/bin/ 2>/dev/null || log "${YELLOW}[!] Error instalando swww${NC}"
+                sudo chmod +x /usr/local/bin/swww /usr/local/bin/swww-daemon 2>/dev/null
+                log "${GREEN}[OK] swww instalado desde GitHub${NC}"
+            else
+                log "${YELLOW}[!] No se pudo descargar swww, continuando...${NC}"
+            fi
+            cd ~ && rm -rf "$tmpdir"
+        else
+            log "${GREEN}[OK] swww ya instalado${NC}"
+        fi
+        
         log "${GREEN}[OK] Utilidades de Wayland instaladas.${NC}"
     fi
 }
@@ -160,20 +182,40 @@ install_wayland_utils() {
 # --- NOTIFICACIONES Y PORTAPAPELES ---
 install_notifications_clipboard() {
     if ask "¿Instalar notificaciones (Mako) y portapapeles (cliphist)?"; then
-        log "${CYAN}[*] Instalando Mako y cliphist...${NC}"
-        sudo apt install -y mako-notifier
+        log "${CYAN}[*] Instalando sistema de notificaciones...${NC}"
         
-        # cliphist - puede no estar en repos, instalar desde binario
-        if ! command_exists cliphist; then
-            local tmpdir=$(mktemp -d)
-            cd "$tmpdir"
-            wget -q https://github.com/sentriz/cliphist/releases/latest/download/cliphist-linux-amd64
-            chmod +x cliphist-linux-amd64
-            sudo mv cliphist-linux-amd64 /usr/local/bin/cliphist
-            cd ~ && rm -rf "$tmpdir"
+        # Instalar mako o dunst como alternativa
+        if sudo apt install -y mako-notifier 2>/dev/null; then
+            log "${GREEN}[OK] Mako instalado${NC}"
+        elif sudo apt install -y dunst 2>/dev/null; then
+            log "${GREEN}[OK] Dunst instalado (alternativa a Mako)${NC}"
+        else
+            log "${YELLOW}[!] No se pudo instalar sistema de notificaciones${NC}"
         fi
         
-        log "${GREEN}[OK] Notificaciones y portapapeles instalados.${NC}"
+        log "${CYAN}[*] Instalando gestor de portapapeles...${NC}"
+        # Instalar wl-clipboard primero (necesario para cliphist)
+        sudo apt install -y wl-clipboard || log "${YELLOW}[!] Error instalando wl-clipboard${NC}"
+        
+        # cliphist - instalar desde binario de GitHub
+        if ! command_exists cliphist; then
+            local tmpdir=$(mktemp -d)
+            cd "$tmpdir" || { log "${RED}[!] Error creando directorio temporal${NC}"; return 1; }
+            
+            log "${CYAN}[*] Descargando cliphist desde GitHub...${NC}"
+            if wget -q --show-progress https://github.com/sentriz/cliphist/releases/latest/download/cliphist-linux-amd64 2>/dev/null; then
+                chmod +x cliphist-linux-amd64
+                sudo mv cliphist-linux-amd64 /usr/local/bin/cliphist || log "${YELLOW}[!] Error instalando cliphist${NC}"
+                log "${GREEN}[OK] cliphist instalado${NC}"
+            else
+                log "${YELLOW}[!] No se pudo descargar cliphist, continuando...${NC}"
+            fi
+            cd ~ && rm -rf "$tmpdir"
+        else
+            log "${GREEN}[OK] cliphist ya instalado${NC}"
+        fi
+        
+        log "${GREEN}[OK] Sistema de notificaciones y portapapeles configurado.${NC}"
     fi
 }
 
@@ -181,7 +223,7 @@ install_notifications_clipboard() {
 install_polkit() {
     if ask "¿Instalar Polkit Agent (autenticación GUI para sudo)?"; then
         log "${CYAN}[*] Instalando Polkit GNOME Agent...${NC}"
-        sudo apt install -y polkit-gnome
+        sudo apt install -y polkit-gnome || log "${RED}[!] Error instalando polkit-gnome${NC}"
         log "${GREEN}[OK] Polkit Agent instalado.${NC}"
     fi
 }
@@ -214,7 +256,7 @@ install_cursor_themes() {
 install_audio() {
     if ask "¿Instalar herramientas de audio (PulseAudio + Pavucontrol + Pamixer)?"; then
         log "${CYAN}[*] Instalando herramientas de audio...${NC}"
-        sudo apt install -y pavucontrol pamixer pulseaudio
+        sudo apt install -y pavucontrol pamixer pulseaudio || log "${RED}[!] Error instalando herramientas de audio${NC}"
         log "${GREEN}[OK] Audio configurado.${NC}"
     fi
 }
@@ -223,7 +265,7 @@ install_audio() {
 install_brightness() {
     if ask "¿Instalar control de brillo (brightnessctl)?"; then
         if ! command_exists brightnessctl; then
-            sudo apt install -y brightnessctl
+            sudo apt install -y brightnessctl || log "${RED}[!] Error instalando brightnessctl${NC}"
             log "${GREEN}[OK] brightnessctl instalado.${NC}"
         else
             log "${GREEN}[OK] brightnessctl ya instalado.${NC}"
@@ -291,22 +333,22 @@ install_starship() {
 # --- ZSH + OH-MY-ZSH ---
 install_zsh() {
     if ask "¿Instalar ZSH + Oh-My-Zsh + plugins?"; then
-        sudo apt install -y zsh zsh-autosuggestions zsh-syntax-highlighting
+        sudo apt install -y zsh zsh-autosuggestions zsh-syntax-highlighting || log "${YELLOW}[!] Error instalando paquetes ZSH${NC}"
         
         if [ ! -d "$HOME/.oh-my-zsh" ]; then
             log "${CYAN}[*] Instalando Oh-My-Zsh...${NC}"
-            sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+            sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended || log "${YELLOW}[!] Error instalando Oh-My-Zsh${NC}"
         fi
         
         ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
         [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ] && \
-            git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
+            git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions" || log "${YELLOW}[!] Error clonando zsh-autosuggestions${NC}"
         
         [ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ] && \
-            git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
+            git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" || log "${YELLOW}[!] Error clonando zsh-syntax-highlighting${NC}"
         
         if [ "$SHELL" != "$(which zsh)" ]; then
-            sudo chsh -s "$(which zsh)" "$USER"
+            sudo chsh -s "$(which zsh)" "$USER" || log "${YELLOW}[!] Error cambiando shell por defecto${NC}"
             log "${GREEN}[OK] ZSH configurado como shell por defecto${NC}"
         fi
         log "${GREEN}[OK] ZSH instalado.${NC}"
@@ -332,32 +374,52 @@ install_keepassxc() {
 # --- NAVEGADORES ---
 install_browsers() {
     if ask "¿Instalar navegadores (Brave, Waterfox, Vivaldi, Firefox)?"; then
-        log "${CYAN}[*] Configurando repositorios de navegadores...${NC}"
+        log "${CYAN}[*] Instalando Firefox...${NC}"
+        sudo apt install -y firefox-esr || sudo apt install -y firefox || log "${YELLOW}[!] Error instalando Firefox${NC}"
         
-        # BRAVE
+        log "${CYAN}[*] Configurando repositorio de Brave...${NC}"
         if ! command_exists brave-browser; then
-            sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg \
-                https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
-            echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
-                | sudo tee /etc/apt/sources.list.d/brave-browser-release.list
+            if sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg \
+                https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg 2>/dev/null; then
+                echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
+                    | sudo tee /etc/apt/sources.list.d/brave-browser-release.list >/dev/null
+                sudo apt update 2>/dev/null
+                sudo apt install -y brave-browser || log "${YELLOW}[!] Error instalando Brave${NC}"
+            else
+                log "${YELLOW}[!] No se pudo configurar repositorio de Brave${NC}"
+            fi
+        else
+            log "${GREEN}[OK] Brave ya instalado${NC}"
         fi
         
-        # WATERFOX
+        log "${CYAN}[*] Configurando repositorio de Waterfox...${NC}"
         if ! command_exists waterfox-g4; then
-            curl -fsSL https://apt.waterfox.net/gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/waterfox.gpg
-            echo "deb [arch=amd64] https://apt.waterfox.net/ waterfox main" \
-                | sudo tee /etc/apt/sources.list.d/waterfox.list
+            if curl -fsSL https://apt.waterfox.net/gpg.key 2>/dev/null | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/waterfox.gpg 2>/dev/null; then
+                echo "deb [arch=amd64] https://apt.waterfox.net/ waterfox main" \
+                    | sudo tee /etc/apt/sources.list.d/waterfox.list >/dev/null
+                sudo apt update 2>/dev/null
+                sudo apt install -y waterfox-g4-kpe || log "${YELLOW}[!] Error instalando Waterfox${NC}"
+            else
+                log "${YELLOW}[!] No se pudo configurar repositorio de Waterfox${NC}"
+            fi
+        else
+            log "${GREEN}[OK] Waterfox ya instalado${NC}"
         fi
 
-        # VIVALDI
+        log "${CYAN}[*] Configurando repositorio de Vivaldi...${NC}"
         if ! command_exists vivaldi-stable; then
-            wget -qO- https://repo.vivaldi.com/archive/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/vivaldi-archive-keyring.gpg
-            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/vivaldi-archive-keyring.gpg] https://repo.vivaldi.com/archive/deb/ stable main" \
-                | sudo tee /etc/apt/sources.list.d/vivaldi.list
+            if wget -qO- https://repo.vivaldi.com/archive/linux_signing_key.pub 2>/dev/null | sudo gpg --dearmor -o /usr/share/keyrings/vivaldi-archive-keyring.gpg 2>/dev/null; then
+                echo "deb [arch=amd64 signed-by=/usr/share/keyrings/vivaldi-archive-keyring.gpg] https://repo.vivaldi.com/archive/deb/ stable main" \
+                    | sudo tee /etc/apt/sources.list.d/vivaldi.list >/dev/null
+                sudo apt update 2>/dev/null
+                sudo apt install -y vivaldi-stable || log "${YELLOW}[!] Error instalando Vivaldi${NC}"
+            else
+                log "${YELLOW}[!] No se pudo configurar repositorio de Vivaldi${NC}"
+            fi
+        else
+            log "${GREEN}[OK] Vivaldi ya instalado${NC}"
         fi
 
-        sudo apt update
-        sudo apt install -y firefox-esr brave-browser waterfox-g4-kpe vivaldi-stable
         log "${GREEN}[OK] Navegadores instalados.${NC}"
     fi
 }
@@ -416,36 +478,54 @@ install_creative() {
 install_nvidia() {
     if ask "¿Instalar drivers NVIDIA propietarios?"; then
         if ! command_exists nvidia-smi; then
-            log "${CYAN}[*] Instalando NVIDIA...${NC}"
-            sudo dpkg --add-architecture i386
-            sudo apt update
-            sudo apt install -y linux-headers-$(uname -r) dkms build-essential
-            sudo apt install -y nvidia-driver firmware-misc-nonfree nvidia-settings \
-                libnvidia-gl-wayland libnvidia-egl-wayland1 libgl1-nvidia-glx:i386
+            log "${CYAN}[*] Instalando NVIDIA drivers...${NC}"
+            
+            # Añadir arquitectura 32-bit
+            sudo dpkg --add-architecture i386 || log "${YELLOW}[!] Error añadiendo arquitectura i386${NC}"
+            sudo apt update || log "${YELLOW}[!] Error actualizando repositorios${NC}"
+            
+            # Instalar headers y herramientas necesarias
+            log "${CYAN}[*] Instalando dependencias NVIDIA...${NC}"
+            sudo apt install -y linux-headers-$(uname -r) dkms build-essential || log "${YELLOW}[!] Error instalando dependencias${NC}"
+            
+            # Instalar drivers NVIDIA
+            log "${CYAN}[*] Instalando paquetes NVIDIA...${NC}"
+            sudo apt install -y nvidia-driver firmware-misc-nonfree || log "${RED}[!] Error instalando nvidia-driver${NC}"
+            sudo apt install -y nvidia-settings || log "${YELLOW}[!] Error instalando nvidia-settings${NC}"
+            sudo apt install -y libnvidia-egl-wayland1 || log "${YELLOW}[!] Error instalando libnvidia-egl-wayland1${NC}"
+            
+            # Soporte 32-bit solo si está disponible (para juegos)
+            if dpkg --print-foreign-architectures | grep -q i386; then
+                sudo apt install -y nvidia-driver-libs:i386 2>/dev/null || log "${YELLOW}[!] Librerías 32-bit no disponibles${NC}"
+            fi
             
             # Activar modeset en GRUB
-            if ! grep -q "nvidia-drm.modeset=1" /etc/default/grub; then
-                sudo sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s/"$/ nvidia-drm.modeset=1"/' /etc/default/grub
-                sudo update-grub
+            log "${CYAN}[*] Configurando GRUB para NVIDIA...${NC}"
+            if ! grep -q "nvidia-drm.modeset=1" /etc/default/grub 2>/dev/null; then
+                sudo sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s/"$/ nvidia-drm.modeset=1"/' /etc/default/grub || log "${YELLOW}[!] Error modificando GRUB${NC}"
+                sudo update-grub || log "${YELLOW}[!] Error actualizando GRUB${NC}"
             fi
             
             # Agregar módulos NVIDIA para cargar al inicio
             log "${CYAN}[*] Configurando módulos NVIDIA para carga automática...${NC}"
-            echo "nvidia" | sudo tee /etc/modules-load.d/nvidia.conf
-            echo "nvidia-drm" | sudo tee -a /etc/modules-load.d/nvidia.conf
-            echo "nvidia-modeset" | sudo tee -a /etc/modules-load.d/nvidia.conf
-            echo "nvidia-uvm" | sudo tee -a /etc/modules-load.d/nvidia.conf
+            echo "nvidia" | sudo tee /etc/modules-load.d/nvidia.conf >/dev/null || log "${YELLOW}[!] Error creando nvidia.conf${NC}"
+            echo "nvidia-drm" | sudo tee -a /etc/modules-load.d/nvidia.conf >/dev/null || true
+            echo "nvidia-modeset" | sudo tee -a /etc/modules-load.d/nvidia.conf >/dev/null || true
+            echo "nvidia-uvm" | sudo tee -a /etc/modules-load.d/nvidia.conf >/dev/null || true
             
             # Configurar opciones de módulo para DRM
-            echo "options nvidia-drm modeset=1" | sudo tee /etc/modprobe.d/nvidia.conf
+            log "${CYAN}[*] Configurando opciones de módulo NVIDIA...${NC}"
+            echo "options nvidia-drm modeset=1" | sudo tee /etc/modprobe.d/nvidia.conf >/dev/null || log "${YELLOW}[!] Error configurando modprobe${NC}"
             
             # Regenerar initramfs
-            sudo update-initramfs -u
+            log "${CYAN}[*] Regenerando initramfs...${NC}"
+            sudo update-initramfs -u || log "${YELLOW}[!] Error actualizando initramfs${NC}"
             
             log "${GREEN}[OK] NVIDIA instalado y configurado.${NC}"
-            log "${YELLOW}[!] IMPORTANTE: Debes reiniciar el sistema para aplicar cambios.${NC}"
+            log "${YELLOW}[!] IMPORTANTE: Debes reiniciar el sistema para aplicar cambios de NVIDIA.${NC}"
         else
-            log "${GREEN}[OK] NVIDIA ya instalado ($(nvidia-smi --query-gpu=driver_version --format=csv,noheader))${NC}"
+            local driver_ver=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null || echo "desconocida")
+            log "${GREEN}[OK] NVIDIA ya instalado (versión: $driver_ver)${NC}"
         fi
     fi
 }
@@ -489,21 +569,22 @@ EOF
 install_security_suite() {
     if ask "¿Activar Suite de Seguridad (UFW, Fail2Ban, ClamAV, RKHunter, Firejail, USBGuard)?"; then
         log "${CYAN}[*] Instalando suite de seguridad...${NC}"
-        sudo apt install -y ufw fail2ban clamav rkhunter firejail usbguard
+        sudo apt install -y ufw fail2ban clamav rkhunter firejail usbguard || log "${YELLOW}[!] Error instalando algunos paquetes de seguridad${NC}"
         
         # Configurar UFW (Firewall)
         log "${CYAN}[*] Configurando UFW (Firewall)...${NC}"
-        sudo ufw --force default deny incoming
-        sudo ufw --force default allow outgoing
-        sudo ufw --force enable
+        sudo ufw --force default deny incoming || log "${YELLOW}[!] Error configurando UFW incoming${NC}"
+        sudo ufw --force default allow outgoing || log "${YELLOW}[!] Error configurando UFW outgoing${NC}"
+        sudo ufw --force enable || log "${YELLOW}[!] Error habilitando UFW${NC}"
         
         # Activar servicios
-        sudo systemctl enable --now fail2ban usbguard
+        sudo systemctl enable --now fail2ban 2>/dev/null || log "${YELLOW}[!] Error habilitando fail2ban${NC}"
+        sudo systemctl enable --now usbguard 2>/dev/null || log "${YELLOW}[!] Error habilitando usbguard${NC}"
         
         # Actualizar bases de datos
         log "${CYAN}[*] Actualizando bases de datos de seguridad...${NC}"
-        sudo freshclam || log "${YELLOW}[!] No se pudo actualizar ClamAV (normal en primera instalación)${NC}"
-        sudo rkhunter --propupd
+        sudo freshclam 2>/dev/null || log "${YELLOW}[!] No se pudo actualizar ClamAV (normal en primera instalación)${NC}"
+        sudo rkhunter --propupd 2>/dev/null || log "${YELLOW}[!] Error actualizando rkhunter${NC}"
         
         log "${GREEN}[OK] Suite de seguridad activada.${NC}"
         log "${YELLOW}[INFO] Firewall UFW activo - Bloqueando conexiones entrantes${NC}"
@@ -515,14 +596,35 @@ install_security_suite() {
 # --- LOCALES ---
 configure_locales() {
     if ask "¿Configurar locales y teclado (ES_PE Latinoamérica)?"; then
-        log "${CYAN}[*] Generando locales...${NC}"
-        sudo sed -i 's/^# *es_PE.UTF-8/es_PE.UTF-8/' /etc/locale.gen
-        sudo locale-gen
+        log "${CYAN}[*] Instalando paquetes de localización...${NC}"
+        sudo apt install -y locales console-setup keyboard-configuration || log "${YELLOW}[!] Error instalando locales${NC}"
+        
+        log "${CYAN}[*] Generando locales español...${NC}"
+        # Descomentar locales en español
+        sudo sed -i 's/^# *es_PE.UTF-8/es_PE.UTF-8/' /etc/locale.gen 2>/dev/null || true
+        sudo sed -i 's/^# *es_ES.UTF-8/es_ES.UTF-8/' /etc/locale.gen 2>/dev/null || true
+        
+        # Generar locales
+        sudo locale-gen es_PE.UTF-8 2>/dev/null || log "${YELLOW}[!] es_PE no disponible${NC}"
+        sudo locale-gen es_ES.UTF-8 2>/dev/null || log "${YELLOW}[!] es_ES no disponible${NC}"
+        sudo locale-gen || log "${YELLOW}[!] Error generando locales${NC}"
+        
+        # Configurar locale por defecto
+        sudo update-locale LANG=es_PE.UTF-8 2>/dev/null || sudo update-locale LANG=es_ES.UTF-8 2>/dev/null || log "${YELLOW}[!] Error configurando locale${NC}"
         
         log "${CYAN}[*] Configurando teclado latinoamericano...${NC}"
-        sudo localectl set-keymap latam
+        # Configurar teclado para consola
+        sudo sed -i 's/XKBLAYOUT=".*"/XKBLAYOUT="latam"/' /etc/default/keyboard 2>/dev/null || true
+        sudo setupcon -k 2>/dev/null || true
         
-        log "${GREEN}[OK] Locales y teclado configurados (es_PE + latam).${NC}"
+        # Configurar con localectl si está disponible
+        if command_exists localectl; then
+            sudo localectl set-keymap latam 2>/dev/null || log "${YELLOW}[!] Error con localectl${NC}"
+            sudo localectl set-x11-keymap latam 2>/dev/null || true
+        fi
+        
+        log "${GREEN}[OK] Locales y teclado configurados (español + latam).${NC}"
+        log "${YELLOW}[INFO] Reinicia la sesión para aplicar cambios de idioma${NC}"
     fi
 }
 
@@ -531,20 +633,48 @@ install_docker() {
     if ask "¿Instalar Docker + Docker Compose?"; then
         if ! command_exists docker; then
             log "${CYAN}[*] Instalando Docker...${NC}"
-            sudo apt install -y ca-certificates curl gnupg lsb-release
+            
+            # Instalar dependencias
+            sudo apt install -y ca-certificates curl gnupg lsb-release apt-transport-https || log "${YELLOW}[!] Error instalando dependencias${NC}"
 
+            # Crear directorio para keys
             sudo mkdir -p /etc/apt/keyrings
-            curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+            
+            # Detectar la distribución correcta
+            if [ -f /etc/os-release ]; then
+                . /etc/os-release
+                DISTRO=$ID
+                VERSION_CODENAME=$(lsb_release -cs 2>/dev/null || echo "bookworm")
+            else
+                DISTRO="debian"
+                VERSION_CODENAME="bookworm"
+            fi
+            
+            log "${CYAN}[*] Detectado: $DISTRO $VERSION_CODENAME${NC}"
+            
+            # Descargar GPG key
+            if curl -fsSL https://download.docker.com/linux/$DISTRO/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg 2>/dev/null; then
+                sudo chmod a+r /etc/apt/keyrings/docker.gpg
+                
+                # Añadir repositorio
+                echo \
+                  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$DISTRO \
+                  $VERSION_CODENAME stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-            echo \
-              "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
-              $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-            sudo apt update
-            sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-            sudo usermod -aG docker $USER
-            log "${GREEN}[OK] Docker instalado. Reinicia sesión para aplicar cambios.${NC}"
+                sudo apt update || log "${YELLOW}[!] Error actualizando repositorios${NC}"
+                
+                # Instalar Docker
+                if sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; then
+                    sudo usermod -aG docker $USER || log "${YELLOW}[!] Error añadiendo usuario al grupo docker${NC}"
+                    sudo systemctl enable --now docker 2>/dev/null || true
+                    log "${GREEN}[OK] Docker instalado correctamente.${NC}"
+                    log "${YELLOW}[INFO] Reinicia sesión para usar docker sin sudo${NC}"
+                else
+                    log "${RED}[!] Error instalando Docker${NC}"
+                fi
+            else
+                log "${RED}[!] Error descargando GPG key de Docker${NC}"
+            fi
         else
             log "${GREEN}[OK] Docker ya instalado.${NC}"
         fi
@@ -554,9 +684,9 @@ install_docker() {
 # --- TLP (Power Management) ---
 install_tlp() {
     if ask "¿Instalar TLP (Gestión de energía)?"; then
-        sudo apt install -y tlp tlp-rdw
-        sudo systemctl enable --now tlp
-        sudo systemctl mask systemd-rfkill.service systemd-rfkill.socket
+        sudo apt install -y tlp tlp-rdw || log "${RED}[!] Error instalando TLP${NC}"
+        sudo systemctl enable --now tlp || log "${YELLOW}[!] Error habilitando TLP${NC}"
+        sudo systemctl mask systemd-rfkill.service systemd-rfkill.socket 2>/dev/null || log "${YELLOW}[!] Error enmascarando rfkill${NC}"
         log "${GREEN}[OK] TLP activado.${NC}"
     fi
 }
@@ -566,33 +696,57 @@ install_plymouth_theme() {
     if ask "¿Instalar tema Plymouth CAZIL?"; then
         log "${CYAN}[*] Instalando tema Plymouth...${NC}"
         
-        sudo apt install -y plymouth plymouth-themes imagemagick
-        sudo mkdir -p /usr/share/plymouth/themes/cazil-cyber
+        # Instalar Plymouth y herramientas necesarias
+        sudo apt install -y plymouth plymouth-themes plymouth-label imagemagick || log "${YELLOW}[!] Error instalando paquetes Plymouth${NC}"
+        
+        # Crear directorio del tema
+        sudo mkdir -p /usr/share/plymouth/themes/cazil-cyber || log "${YELLOW}[!] Error creando directorio del tema${NC}"
         
         if [ -f "$DOTFILES_DIR/plymouth/themes/cazil-cyber.plymouth" ]; then
-            sudo cp "$DOTFILES_DIR/plymouth/themes/cazil-cyber.plymouth" /usr/share/plymouth/themes/cazil-cyber/
-            sudo cp "$DOTFILES_DIR/plymouth/themes/cazil-cyber.script" /usr/share/plymouth/themes/cazil-cyber/
+            # Copiar archivos del tema
+            log "${CYAN}[*] Copiando archivos del tema CAZIL...${NC}"
+            sudo cp "$DOTFILES_DIR/plymouth/themes/cazil-cyber.plymouth" /usr/share/plymouth/themes/cazil-cyber/ || log "${YELLOW}[!] Error copiando .plymouth${NC}"
+            sudo cp "$DOTFILES_DIR/plymouth/themes/cazil-cyber.script" /usr/share/plymouth/themes/cazil-cyber/ || log "${YELLOW}[!] Error copiando .script${NC}"
             
             # Copiar fondo con logo
             if [ -f "$DOTFILES_DIR/wallpapers/bg_grub1_con_logo.png" ]; then
-                sudo cp "$DOTFILES_DIR/wallpapers/bg_grub1_con_logo.png" /usr/share/plymouth/themes/cazil-cyber/
+                log "${CYAN}[*] Copiando imagen de fondo...${NC}"
+                sudo cp "$DOTFILES_DIR/wallpapers/bg_grub1_con_logo.png" /usr/share/plymouth/themes/cazil-cyber/ || log "${YELLOW}[!] Error copiando fondo${NC}"
+            else
+                log "${YELLOW}[!] No se encontró bg_grub1_con_logo.png${NC}"
             fi
             
             # Crear imágenes de barra de progreso si imagemagick está disponible
             if command -v convert &>/dev/null; then
                 log "${CYAN}[*] Creando imágenes de barra de progreso...${NC}"
                 sudo convert -size 400x20 xc:'#1a1b2e' -fill '#33ccff' -draw "rectangle 0,0 0,20" \
-                    /usr/share/plymouth/themes/cazil-cyber/progress_box.png
+                    /usr/share/plymouth/themes/cazil-cyber/progress_box.png 2>/dev/null || log "${YELLOW}[!] Error creando progress_box${NC}"
                 sudo convert -size 400x20 xc:'#00d9ff' \
-                    /usr/share/plymouth/themes/cazil-cyber/progress_bar.png
+                    /usr/share/plymouth/themes/cazil-cyber/progress_bar.png 2>/dev/null || log "${YELLOW}[!] Error creando progress_bar${NC}"
             else
-                log "${YELLOW}[!] ImageMagick no disponible, se omiten barras de progreso animadas${NC}"
+                log "${YELLOW}[!] ImageMagick no disponible, creando imágenes básicas...${NC}"
+                # Crear imágenes simples sin ImageMagick
+                sudo touch /usr/share/plymouth/themes/cazil-cyber/progress_box.png
+                sudo touch /usr/share/plymouth/themes/cazil-cyber/progress_bar.png
             fi
             
-            # Establecer como tema por defecto
-            sudo plymouth-set-default-theme -R cazil-cyber
-            sudo update-initramfs -u
-            log "${GREEN}[OK] Tema Plymouth instalado.${NC}"
+            # Establecer permisos correctos
+            sudo chmod 644 /usr/share/plymouth/themes/cazil-cyber/* 2>/dev/null
+            
+            # Verificar que existe el comando update-alternatives para Plymouth
+            if command -v update-alternatives &>/dev/null; then
+                log "${CYAN}[*] Configurando tema por defecto con update-alternatives...${NC}"
+                sudo update-alternatives --install /usr/share/plymouth/themes/default.plymouth default.plymouth \
+                    /usr/share/plymouth/themes/cazil-cyber/cazil-cyber.plymouth 100 2>/dev/null || log "${YELLOW}[!] Error con update-alternatives${NC}"
+                sudo update-alternatives --set default.plymouth /usr/share/plymouth/themes/cazil-cyber/cazil-cyber.plymouth 2>/dev/null || log "${YELLOW}[!] Error configurando default${NC}"
+            fi
+            
+            # Actualizar initramfs
+            log "${CYAN}[*] Actualizando initramfs...${NC}"
+            sudo update-initramfs -u 2>/dev/null || log "${YELLOW}[!] Error actualizando initramfs${NC}"
+            
+            log "${GREEN}[OK] Tema Plymouth CAZIL instalado.${NC}"
+            log "${YELLOW}[INFO] El tema se mostrará en el próximo reinicio${NC}"
         else
             log "${RED}[!] No se encontró plymouth/themes/cazil-cyber.plymouth${NC}"
         fi
@@ -637,28 +791,72 @@ configure_hyprland_autostart() {
     if ask "¿Configurar inicio automático de Hyprland al login?"; then
         log "${CYAN}[*] Configurando auto-inicio de Hyprland...${NC}"
         
-        # ~/.bash_profile
+        # 1. Desactivar todos los display managers
+        log "${CYAN}[*] Desactivando display managers (GDM, SDDM, LightDM)...${NC}"
+        for dm in gdm gdm3 sddm lightdm lxdm xdm; do
+            if systemctl is-enabled $dm 2>/dev/null | grep -q enabled; then
+                log "${YELLOW}[*] Desactivando $dm...${NC}"
+                sudo systemctl disable $dm 2>/dev/null || log "${YELLOW}[!] Error desactivando $dm${NC}"
+                sudo systemctl stop $dm 2>/dev/null || true
+            fi
+        done
+        
+        # 2. Remover GNOME y otros DEs si están instalados
+        if ask "¿Desinstalar GNOME y otros entornos de escritorio innecesarios?"; then
+            log "${CYAN}[*] Removiendo entornos de escritorio innecesarios...${NC}"
+            sudo apt remove --purge -y gnome-shell gdm3 mutter 2>/dev/null || log "${YELLOW}[!] GNOME no estaba instalado${NC}"
+            sudo apt autoremove -y 2>/dev/null || true
+        fi
+        
+        # 3. Configurar ~/.bash_profile
+        log "${CYAN}[*] Configurando ~/.bash_profile...${NC}"
         cat > "$HOME/.bash_profile" << 'BASH_PROFILE_EOF'
 # Auto-inicio de Hyprland en tty1
-if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then
+if [ -z "$DISPLAY" ] && [ -z "$WAYLAND_DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then
     exec Hyprland
 fi
 BASH_PROFILE_EOF
-        
         log "${GREEN}[OK] ~/.bash_profile configurado${NC}"
         
-        # ~/.zprofile (si usa zsh)
+        # 4. Configurar ~/.zprofile (si usa zsh)
         if command_exists zsh; then
+            log "${CYAN}[*] Configurando ~/.zprofile para ZSH...${NC}"
             cat > "$HOME/.zprofile" << 'ZPROFILE_EOF'
 # Auto-inicio de Hyprland en tty1
-if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then
+if [ -z "$DISPLAY" ] && [ -z "$WAYLAND_DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then
     exec Hyprland
 fi
 ZPROFILE_EOF
             log "${GREEN}[OK] ~/.zprofile configurado${NC}"
         fi
         
-        log "${YELLOW}[!] Hyprland se iniciará automáticamente en tty1 después del login${NC}"
+        # 5. Configurar ~/.xinitrc como fallback
+        log "${CYAN}[*] Configurando ~/.xinitrc...${NC}"
+        cat > "$HOME/.xinitrc" << 'XINITRC_EOF'
+#!/bin/sh
+exec Hyprland
+XINITRC_EOF
+        chmod +x "$HOME/.xinitrc"
+        log "${GREEN}[OK] ~/.xinitrc configurado${NC}"
+        
+        # 6. Limpiar autostart de otros entornos de escritorio
+        if [ -d "$HOME/.config/autostart" ]; then
+            log "${CYAN}[*] Limpiando autostart de otros entornos de escritorio...${NC}"
+            rm -f "$HOME/.config/autostart/gnome-"* 2>/dev/null || true
+            rm -f "$HOME/.config/autostart/kde-"* 2>/dev/null || true
+        fi
+        
+        # 7. Configurar sistema para iniciar en modo multi-usuario (texto)
+        log "${CYAN}[*] Configurando target del sistema a multi-user...${NC}"
+        sudo systemctl set-default multi-user.target 2>/dev/null || log "${YELLOW}[!] Error configurando target${NC}"
+        log "${GREEN}[OK] Sistema configurado para iniciar en modo texto${NC}"
+        
+        log "\n${GREEN}[OK] Auto-inicio de Hyprland configurado exitosamente.${NC}"
+        log "${YELLOW}[!] Al reiniciar:${NC}"
+        log "${YELLOW}    - Verás login en texto (tty1)${NC}"
+        log "${YELLOW}    - Ingresa usuario/contraseña${NC}"
+        log "${YELLOW}    - Hyprland iniciará automáticamente${NC}"
+        log "${YELLOW}    - NO iniciará X11 ni otros entornos de escritorio${NC}"
     fi
 }
 
