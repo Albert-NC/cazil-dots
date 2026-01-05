@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#el xrandr solo sube o baja el gamma
 OUTPUT="eDP-1"  # Cambia por el nombre de tu pantalla
 
 # Obtiene el brillo actual
